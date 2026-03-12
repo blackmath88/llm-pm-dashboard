@@ -1,0 +1,25 @@
+{
+  "lastUpdated": "2026-03-12T16:45:00Z",
+  "projects": [
+    {
+      "id": "confimo-ai-2026",
+      "name": "Confimo AG AI-Enabled Buchhaltung Transformation",
+      "status": "active",
+      "type": "client-consulting",
+      "created": "2026-02-06T00:00:00Z",
+      "lastUpdated": "2026-03-12T16:30:00Z",
+      "file": "projects/confimo-ai-2026.json",
+      "keyMetric": "Phase 0 Complete, Week 1 Pending",
+      "tags": ["AI-adoption", "SME", "consulting", "portfolio"],
+      "priority": "high",
+      "enabledModules": {
+        "stakeholders": true,
+        "change": true,
+        "hours": true,
+        "budget": true,
+        "risks": true,
+        "retrospective": true
+      }
+    }
+  ]
+}

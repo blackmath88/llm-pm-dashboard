@@ -1,0 +1,13 @@
+name = "pm-gateway-placeholder"
+main = "cloudflare-worker-fixed.js"
+compatibility_date = "2026-03-12"
+
+# Optional: if you later add a custom domain route
+# routes = [
+#   { pattern = "pm.steponthebridge.ch/*", zone_name = "steponthebridge.ch" }
+# ]
+
+# Optional KV cache (uncomment and insert your KV namespace ID)
+# [[kv_namespaces]]
+# binding = "PM_CACHE"
+# id = "YOUR_KV_NAMESPACE_ID"
