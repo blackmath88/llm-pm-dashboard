@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Project Management</title><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Project Management</title>
+  <meta name="color-scheme" content="dark light" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* (same CSS as v4 file) */
+    :root {
+      --bg0: #f6f8ff; --bg1: #eef2ff; --card: rgba(0,0,0,.04);
+      --card2: rgba(0,0,0,.06); --txt: rgba(0,0,0,.88);
+      --muted: rgba(0,0,0,.65); --faint: rgba(0,0,0,.50);
+      --line: rgba(0,0,0,.10); --accent: #7aa7ff; --ok: #37d67a;
+      --warn: #ffcc66; --hot: #ff6b6b; --shadow: 0 18px 55px rgba(20,30,60,.18);
+      --shadow-sm: 0 8px 24px rgba(20,30,60,.12);
+      --shadow-card: 0 12px 32px rgba(20,30,60,.14);
+      --radius: 18px; --radius2: 12px;
+      --mono: 'JetBrains Mono', ui-monospace, monospace;
+      --sans: 'Plus Jakarta Sans', ui-sans-serif, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg0: #0b1020; --bg1: #0f1730; --card: rgba(255,255,255,.06);
+        --card2: rgba(255,255,255,.10); --txt: rgba(255,255,255,.92);
+        --muted: rgba(255,255,255,.70); --faint: rgba(255,255,255,.52);
+        --line: rgba(255,255,255,.12); --shadow: 0 20px 60px rgba(0,0,0,.35);
+        --shadow-sm: 0 12px 32px rgba(0,0,0,.25);
+        --shadow-card: 0 16px 40px rgba(0,0,0,.30);
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--sans); color: var(--txt);
+      background:
+        radial-gradient(1200px 600px at 20% -10%, rgba(122,167,255,.35), transparent 55%),
+        radial-gradient(900px 500px at 95% 10%, rgba(55,214,122,.22), transparent 60%),
+        radial-gradient(1200px 800px at 40% 110%, rgba(255,204,102,.18), transparent 55%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      background-attachment: fixed; line-height: 1.6; padding: 2rem; min-height: 100vh;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    header { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 2rem; margin-bottom: 2rem; box-shadow: var(--shadow-card); }
+    h1 { font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.5rem; }
+    .subtitle { color: var(--muted); font-size: 1rem; }
+    .header-actions { display: flex; gap: .75rem; margin-top: 1.5rem; flex-wrap: wrap; align-items:center; }
+    .btn {
+      padding: 0.65rem 1.2rem; border: 1px solid var(--line); border-radius: var(--radius2);
+      font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.12s ease;
+      font-family: inherit; background: linear-gradient(180deg, var(--card2), var(--card));
+      color: var(--txt); box-shadow: var(--shadow-sm); text-decoration: none; display: inline-block;
+    }
+    .btn:hover { transform: translateY(-1px); border-color: rgba(122,167,255,.45); }
+    .btn-primary { background: linear-gradient(180deg, #8fb5ff, var(--accent)); color: white;
+      border-color: rgba(122,167,255,.3); }
+    .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 1.25rem; }
+    .project-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 1.75rem; box-shadow: var(--shadow-card); transition: all 0.2s ease; cursor: pointer;
+      text-decoration: none; color: inherit; display: block; }
+    .project-card:hover { background: var(--card2); transform: translateY(-3px); box-shadow: var(--shadow); }
+    .project-card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 1rem; }
+    .project-title { font-size: 1.15rem; font-weight: 700; line-height: 1.3; margin-bottom: 0.5rem; }
+    .project-status { padding: 0.35rem 0.75rem; border-radius: 999px; font-size: 0.65rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+    .status-active { background: rgba(55,214,122,.15); color: var(--ok); border: 1px solid rgba(55,214,122,.25); }
+    .status-paused { background: rgba(255,204,102,.15); color: var(--warn); border: 1px solid rgba(255,204,102,.25); }
+    .status-completed { background: rgba(122,167,255,.15); color: var(--accent); border: 1px solid rgba(122,167,255,.25); }
+    .project-metric { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; }
+    .project-tags { display:flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+    .tag { padding: 0.3rem 0.65rem; background: var(--card2); border: 1px solid var(--line);
+      border-radius: 8px; font-size: 0.7rem; color: var(--faint); }
+    .project-meta { font-family: var(--mono); font-size: 0.7rem; color: var(--faint); margin-top: 1rem;
+      padding-top: 1rem; border-top: 1px solid var(--line); }
+    .loading { text-align: center; padding: 3rem; color: var(--muted); }
+    .error { background: rgba(255,107,107,.1); border: 1px solid rgba(255,107,107,.3);
+      border-radius: var(--radius2); padding: 1.5rem; margin-bottom: 2rem; color: var(--hot); }
+    .sync-time { font-family: var(--mono); font-size: 0.75rem; color: var(--faint); margin-left: auto; }
+    @media (max-width: 768px) { body { padding: 1rem; } h1 { font-size: 1.75rem; }
+      .projects-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Project Management</h1>
+      <p class="subtitle">Multi-project dashboard with LLM-driven updates</p>
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="refreshProjects()">Refresh</button>
+        <span class="sync-time" id="lastSynced">Last synced: Never</span>
+      </div>
+    </header>
+
+    <div id="errorDisplay" style="display:none;"></div>
+    <div id="projectsContainer"><div class="loading">Loading projects...</div></div>
+  </div>
+
+  <script>
+    const WORKER_URL = 'https://pm-gateway.imbodi55.workers.dev';
+    const READ_PASSWORD = null;
+
+    window.addEventListener('DOMContentLoaded', loadProjects);
+
+    async function loadProjects() {
+      const container = document.getElementById('projectsContainer');
+      container.innerHTML = '<div class="loading">Loading projects...</div>';
+      hideError();
+
+      try {
+        let url = `${WORKER_URL}/index`;
+        if (READ_PASSWORD) url += `?password=${encodeURIComponent(READ_PASSWORD)}`;
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || `Server error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const projects = data.projects || [];
+
+        if (projects.length === 0) {
+          container.innerHTML = '<div class="loading">No projects found.</div>';
+          updateLastSynced();
+          return;
+        }
+
+        projects.sort((a, b) => {
+          if (a.status === 'active' && b.status !== 'active') return -1;
+          if (a.status !== 'active' && b.status === 'active') return 1;
+          const priorityOrder = { high: 0, medium: 1, low: 2 };
+          return (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3);
+        });
+
+        renderProjects(projects);
+        updateLastSynced();
+      } catch (error) {
+        showError(`Failed to load projects: ${error.message}`);
+        container.innerHTML = '';
+      }
+    }
+
+    function renderProjects(projects) {
+      const container = document.getElementById('projectsContainer');
+      container.innerHTML = '';
+      const grid = document.createElement('div');
+      grid.className = 'projects-grid';
+      projects.forEach(project => grid.appendChild(createProjectCard(project)));
+      container.appendChild(grid);
+    }
+
+    function createProjectCard(project) {
+      const card = document.createElement('a');
+      card.className = 'project-card';
+      card.href = `project.html?id=${encodeURIComponent(project.id)}`;
+
+      const statusClass = `status-${project.status}`;
+      card.innerHTML = `
+        <div class="project-card-header">
+          <div>
+            <h3 class="project-title">${escapeHtml(project.name || 'Unnamed Project')}</h3>
+            <div class="project-metric">${escapeHtml(project.keyMetric || 'No status')}</div>
+          </div>
+          <div class="project-status ${statusClass}">${escapeHtml(project.status || '')}</div>
+        </div>
+        <div class="project-tags">
+          ${(project.tags || []).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
+        </div>
+        <div class="project-meta">Last updated: ${formatDate(project.lastUpdated)}</div>
+      `;
+      return card;
+    }
+
+    function refreshProjects() { loadProjects(); }
+
+    function showError(message) {
+      const errorDiv = document.getElementById('errorDisplay');
+      errorDiv.className = 'error';
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+    }
+    function hideError() { document.getElementById('errorDisplay').style.display = 'none'; }
+    function updateLastSynced() {
+      const now = new Date();
+      document.getElementById('lastSynced').textContent = `Last synced: ${now.toLocaleTimeString()}`;
+    }
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text ?? '';
+      return div.innerHTML;
+    }
+    function formatDate(isoString) {
+      if (!isoString) return 'N/A';
+      const date = new Date(isoString);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+      if (diffMins < 60) return `${diffMins} min ago`;
+      if (diffHours < 24) return `${diffHours} hours ago`;
+      if (diffDays < 7) return `${diffDays} days ago`;
+      return date.toLocaleDateString();
+    }
+  </script>
+</body>
+</html>
+  <meta name="color-scheme" content="dark light" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* (same CSS as v4 file) */
+    :root {
+      --bg0: #f6f8ff; --bg1: #eef2ff; --card: rgba(0,0,0,.04);
+      --card2: rgba(0,0,0,.06); --txt: rgba(0,0,0,.88);
+      --muted: rgba(0,0,0,.65); --faint: rgba(0,0,0,.50);
+      --line: rgba(0,0,0,.10); --accent: #7aa7ff; --ok: #37d67a;
+      --warn: #ffcc66; --hot: #ff6b6b; --shadow: 0 18px 55px rgba(20,30,60,.18);
+      --shadow-sm: 0 8px 24px rgba(20,30,60,.12);
+      --shadow-card: 0 12px 32px rgba(20,30,60,.14);
+      --radius: 18px; --radius2: 12px;
+      --mono: 'JetBrains Mono', ui-monospace, monospace;
+      --sans: 'Plus Jakarta Sans', ui-sans-serif, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg0: #0b1020; --bg1: #0f1730; --card: rgba(255,255,255,.06);
+        --card2: rgba(255,255,255,.10); --txt: rgba(255,255,255,.92);
+        --muted: rgba(255,255,255,.70); --faint: rgba(255,255,255,.52);
+        --line: rgba(255,255,255,.12); --shadow: 0 20px 60px rgba(0,0,0,.35);
+        --shadow-sm: 0 12px 32px rgba(0,0,0,.25);
+        --shadow-card: 0 16px 40px rgba(0,0,0,.30);
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--sans); color: var(--txt);
+      background:
+        radial-gradient(1200px 600px at 20% -10%, rgba(122,167,255,.35), transparent 55%),
+        radial-gradient(900px 500px at 95% 10%, rgba(55,214,122,.22), transparent 60%),
+        radial-gradient(1200px 800px at 40% 110%, rgba(255,204,102,.18), transparent 55%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      background-attachment: fixed; line-height: 1.6; padding: 2rem; min-height: 100vh;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    header { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 2rem; margin-bottom: 2rem; box-shadow: var(--shadow-card); }
+    h1 { font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.5rem; }
+    .subtitle { color: var(--muted); font-size: 1rem; }
+    .header-actions { display: flex; gap: .75rem; margin-top: 1.5rem; flex-wrap: wrap; align-items:center; }
+    .btn {
+      padding: 0.65rem 1.2rem; border: 1px solid var(--line); border-radius: var(--radius2);
+      font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.12s ease;
+      font-family: inherit; background: linear-gradient(180deg, var(--card2), var(--card));
+      color: var(--txt); box-shadow: var(--shadow-sm); text-decoration: none; display: inline-block;
+    }
+    .btn:hover { transform: translateY(-1px); border-color: rgba(122,167,255,.45); }
+    .btn-primary { background: linear-gradient(180deg, #8fb5ff, var(--accent)); color: white;
+      border-color: rgba(122,167,255,.3); }
+    .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 1.25rem; }
+    .project-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 1.75rem; box-shadow: var(--shadow-card); transition: all 0.2s ease; cursor: pointer;
+      text-decoration: none; color: inherit; display: block; }
+    .project-card:hover { background: var(--card2); transform: translateY(-3px); box-shadow: var(--shadow); }
+    .project-card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 1rem; }
+    .project-title { font-size: 1.15rem; font-weight: 700; line-height: 1.3; margin-bottom: 0.5rem; }
+    .project-status { padding: 0.35rem 0.75rem; border-radius: 999px; font-size: 0.65rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+    .status-active { background: rgba(55,214,122,.15); color: var(--ok); border: 1px solid rgba(55,214,122,.25); }
+    .status-paused { background: rgba(255,204,102,.15); color: var(--warn); border: 1px solid rgba(255,204,102,.25); }
+    .status-completed { background: rgba(122,167,255,.15); color: var(--accent); border: 1px solid rgba(122,167,255,.25); }
+    .project-metric { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; }
+    .project-tags { display:flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+    .tag { padding: 0.3rem 0.65rem; background: var(--card2); border: 1px solid var(--line);
+      border-radius: 8px; font-size: 0.7rem; color: var(--faint); }
+    .project-meta { font-family: var(--mono); font-size: 0.7rem; color: var(--faint); margin-top: 1rem;
+      padding-top: 1rem; border-top: 1px solid var(--line); }
+    .loading { text-align: center; padding: 3rem; color: var(--muted); }
+    .error { background: rgba(255,107,107,.1); border: 1px solid rgba(255,107,107,.3);
+      border-radius: var(--radius2); padding: 1.5rem; margin-bottom: 2rem; color: var(--hot); }
+    .sync-time { font-family: var(--mono); font-size: 0.75rem; color: var(--faint); margin-left: auto; }
+    @media (max-width: 768px) { body { padding: 1rem; } h1 { font-size: 1.75rem; }
+      .projects-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Project Management</h1>
+      <p class="subtitle">Multi-project dashboard with LLM-driven updates</p>
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="refreshProjects()">Refresh</button>
+        <span class="sync-time" id="lastSynced">Last synced: Never</span>
+      </div>
+    </header>
+
+    <div id="errorDisplay" style="display:none;"></div>
+    <div id="projectsContainer"><div class="loading">Loading projects...</div></div>
+  </div>
+
+  <script>
+    const WORKER_URL = 'https://pm-gateway.your-account.workers.dev';
+    const READ_PASSWORD = null;
+
+    window.addEventListener('DOMContentLoaded', loadProjects);
+
+    async function loadProjects() {
+      const container = document.getElementById('projectsContainer');
+      container.innerHTML = '<div class="loading">Loading projects...</div>';
+      hideError();
+
+      try {
+        let url = `${WORKER_URL}/index`;
+        if (READ_PASSWORD) url += `?password=${encodeURIComponent(READ_PASSWORD)}`;
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || `Server error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const projects = data.projects || [];
+
+        if (projects.length === 0) {
+          container.innerHTML = '<div class="loading">No projects found.</div>';
+          updateLastSynced();
+          return;
+        }
+
+        projects.sort((a, b) => {
+          if (a.status === 'active' && b.status !== 'active') return -1;
+          if (a.status !== 'active' && b.status === 'active') return 1;
+          const priorityOrder = { high: 0, medium: 1, low: 2 };
+          return (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3);
+        });
+
+        renderProjects(projects);
+        updateLastSynced();
+      } catch (error) {
+        showError(`Failed to load projects: ${error.message}`);
+        container.innerHTML = '';
+      }
+    }
+
+    function renderProjects(projects) {
+      const container = document.getElementById('projectsContainer');
+      container.innerHTML = '';
+      const grid = document.createElement('div');
+      grid.className = 'projects-grid';
+      projects.forEach(project => grid.appendChild(createProjectCard(project)));
+      container.appendChild(grid);
+    }
+
+    function createProjectCard(project) {
+      const card = document.createElement('a');
+      card.className = 'project-card';
+      card.href = `project.html?id=${encodeURIComponent(project.id)}`;
+
+      const statusClass = `status-${project.status}`;
+      card.innerHTML = `
+        <div class="project-card-header">
+          <div>
+            <h3 class="project-title">${escapeHtml(project.name || 'Unnamed Project')}</h3>
+            <div class="project-metric">${escapeHtml(project.keyMetric || 'No status')}</div>
+          </div>
+          <div class="project-status ${statusClass}">${escapeHtml(project.status || '')}</div>
+        </div>
+        <div class="project-tags">
+          ${(project.tags || []).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
+        </div>
+        <div class="project-meta">Last updated: ${formatDate(project.lastUpdated)}</div>
+      `;
+      return card;
+    }
+
+    function refreshProjects() { loadProjects(); }
+
+    function showError(message) {
+      const errorDiv = document.getElementById('errorDisplay');
+      errorDiv.className = 'error';
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+    }
+    function hideError() { document.getElementById('errorDisplay').style.display = 'none'; }
+    function updateLastSynced() {
+      const now = new Date();
+      document.getElementById('lastSynced').textContent = `Last synced: ${now.toLocaleTimeString()}`;
+    }
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text ?? '';
+      return div.innerHTML;
+    }
+    function formatDate(isoString) {
+      if (!isoString) return 'N/A';
+      const date = new Date(isoString);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+      if (diffMins < 60) return `${diffMins} min ago`;
+      if (diffHours < 24) return `${diffHours} hours ago`;
+      if (diffDays < 7) return `${diffDays} days ago`;
+      return date.toLocaleDateString();
+    }
+  </script>
+</body>
+</html>
