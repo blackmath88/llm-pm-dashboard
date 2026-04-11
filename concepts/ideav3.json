@@ -1,0 +1,364 @@
+{
+  "project": {
+    "name": "AI-native personal PM system",
+    "codename": "OpenMind",
+    "owner": "Achim Imboden",
+    "status": "architecture defined — not yet built",
+    "version": "0.2",
+    "created": "2026-04-11",
+    "context": "Built on top of existing sprint platform (Supabase + GitHub Pages). Extension of the OpenClaw bridge concept previously designed. Solves the scattered-projects problem across Claude conversations, HTML tools, and meetings."
+  },
+
+  "problem": {
+    "core": "Multiple active projects scattered across Claude conversations with no unified view, no persistent memory across sessions, and no way to query semantically across all content.",
+    "pain_points": [
+      "Claude conversations end and context is lost",
+      "HTML tools (sprint board, change management suite) produce outputs that go nowhere",
+      "Meeting notes stay in notebooks or voice memos, never connected to projects",
+      "No portfolio view — impossible to see all projects at a glance",
+      "Status is always in your head, never in a system"
+    ],
+    "previous_attempts": [
+      {
+        "name": "GitHub JSON dashboard",
+        "what_worked": "Read layer was clean — dashboard fetched JSON, rendered well",
+        "what_failed": "Write path required manual JSON editing in GitHub. Drifted immediately. No intelligence."
+      },
+      {
+        "name": "OpenClaw bridge (v1 concept)",
+        "what_worked": "Correct architectural instinct — local agent as intermediary",
+        "what_failed": "Missing the intelligence layer. No structured extraction. No vector layer. Never built."
+      }
+    ]
+  },
+
+  "core_concept": "A local-first, AI-native project operating system. Raw inputs flow into an orchestration layer on a Mac Mini. Two local models run in parallel on every input: Gemma 3 4B extracts structured data, nomic-embed-text generates a semantic vector. Both write to Supabase. A static GitHub Pages dashboard reads from Supabase for exact queries and semantic search. Zero cloud inference cost. Private data stays local.",
+
+  "principles": [
+    "Capture friction must be near zero — every input path under 60 seconds",
+    "Intelligence at ingestion, not at query time",
+    "Two query modes always available: exact SQL and semantic similarity",
+    "No cloud dependency for AI — everything runs on Mac Mini",
+    "Static frontend — no backend server to maintain beyond OpenClaw"
+  ],
+
+  "architecture": {
+
+    "layer_1_inputs": {
+      "description": "Three ways to get data into the system. All converge on OpenClaw POST /ingest.",
+      "sources": [
+        {
+          "name": "update.html",
+          "type": "Browser form",
+          "flow": "Open on phone or desktop → paste raw text (meeting notes, brain dump, Claude export) → POST to OpenClaw via tunnel → confirmation toast",
+          "friction": "~30 seconds"
+        },
+        {
+          "name": "Claude conversation export",
+          "type": "Manual text copy",
+          "flow": "At end of any Claude conversation → ask Claude to summarise as project update → copy output → paste into update.html OR drop as .txt into watched folder",
+          "friction": "~90 seconds",
+          "note": "Claude.ai CSP blocks direct API calls from chat. Copy-paste is the bridge."
+        },
+        {
+          "name": "File watcher — ~/pm-inbox/",
+          "type": "Filesystem trigger",
+          "flow": "Drop any .txt file into watched folder on Mac Mini → OpenClaw detects new file → auto-ingests → file moved to ~/pm-inbox/processed/",
+          "friction": "0 seconds after drop"
+        }
+      ]
+    },
+
+    "layer_2_orchestration": {
+      "description": "OpenClaw HTTP server running on Mac Mini. The intelligence layer. Receives raw text, runs two parallel AI jobs, writes structured + vector data to Supabase.",
+      "runtime": "OpenClaw on Mac Mini M1 8GB",
+      "endpoints": [
+        {
+          "path": "POST /ingest",
+          "input": "{ text: string, project_hint?: string, source?: string }",
+          "jobs": ["classify_input", "extract_structure", "generate_embedding"],
+          "output": "{ success: true, project_id, update_id, tasks_created, decisions_created }"
+        },
+        {
+          "path": "POST /search",
+          "input": "{ query: string, limit?: number, project_id?: string }",
+          "jobs": ["generate_embedding"],
+          "output": "top-k semantically similar chunks with source metadata"
+        },
+        {
+          "path": "GET /projects",
+          "description": "Proxy list of projects from Supabase — useful for update.html dropdown"
+        },
+        {
+          "path": "GET /health",
+          "description": "Returns Ollama status, Supabase connectivity, last ingest timestamp"
+        }
+      ],
+      "jobs": [
+        {
+          "name": "classify_input",
+          "model": "Gemma 3 4B",
+          "prompt_goal": "Determine what type of input this is and which project it belongs to",
+          "output_fields": ["input_type", "project_id_guess", "confidence"],
+          "input_types": ["update", "decision", "task_list", "idea", "meeting_note", "reflection"]
+        },
+        {
+          "name": "extract_structure",
+          "model": "Gemma 3 4B",
+          "prompt_goal": "Pull structured data from raw text — tasks, decisions, status changes, key points",
+          "output_fields": [
+            "summary (2-3 sentences)",
+            "tasks[] (title, status, due_date?)",
+            "decisions[] (body, context)",
+            "status_change? (old_status, new_status)",
+            "tags[]",
+            "next_review_date?"
+          ]
+        },
+        {
+          "name": "generate_embedding",
+          "model": "nomic-embed-text",
+          "input": "raw text content",
+          "output": "float[768] vector",
+          "note": "Runs in parallel with Gemma jobs — not sequential. Both fire at same time."
+        }
+      ]
+    },
+
+    "layer_3_remote_access": {
+      "description": "Makes OpenClaw reachable from outside home network so update.html on GitHub Pages works from phone, client site, anywhere.",
+      "options": [
+        {
+          "name": "Tailscale",
+          "recommended": true,
+          "why": "Zero config, stable, private mesh VPN, free for personal use. Mac Mini gets a permanent TS IP. update.html POSTs to that IP.",
+          "setup_time": "~10 minutes"
+        },
+        {
+          "name": "Cloudflare Tunnel",
+          "why": "Public HTTPS URL without exposing home IP. Better if you want to share update.html with others.",
+          "tradeoff": "Slightly more config, but public URL is a security consideration"
+        }
+      ]
+    },
+
+    "layer_4_storage": {
+      "provider": "Supabase (PostgreSQL + pgvector extension)",
+      "setup_command": "CREATE EXTENSION IF NOT EXISTS vector;",
+      "tables": [
+        {
+          "name": "projects",
+          "columns": "id (uuid), code (text), title (text), status (text), description (text), context_url (text), facilitator (text), updated_at (timestamptz), created_at (timestamptz)",
+          "purpose": "Master project registry. One row per project. Status: active | paused | done | archived."
+        },
+        {
+          "name": "updates",
+          "columns": "id (uuid), project_id (fk), raw_text (text), summary (text), input_type (text), source (text), submitted_at (timestamptz)",
+          "purpose": "Timestamped log of everything that happened. Raw + structured. The append-only event log."
+        },
+        {
+          "name": "tasks",
+          "columns": "id (uuid), project_id (fk), update_id (fk nullable), title (text), status (text), due_date (date nullable), created_at (timestamptz)",
+          "purpose": "Extracted tasks from updates. Can be created manually or auto-extracted by Gemma."
+        },
+        {
+          "name": "decisions",
+          "columns": "id (uuid), project_id (fk), update_id (fk nullable), body (text), made_at (timestamptz)",
+          "purpose": "Explicit decisions captured. Queryable separately from general updates."
+        },
+        {
+          "name": "embeddings",
+          "columns": "id (uuid), source_id (uuid), source_type (text), content (text), embedding (vector(768)), created_at (timestamptz)",
+          "purpose": "Semantic memory layer. Every update, decision and task gets a vector. Enables natural language search across all project history.",
+          "index": "CREATE INDEX ON embeddings USING ivfflat (embedding vector_cosine_ops);"
+        }
+      ],
+      "query_modes": {
+        "exact_sql": "Filter by project, status, date range, input_type. Standard Supabase REST queries from dashboard.",
+        "semantic_search": "POST /search → OpenClaw embeds query → pgvector cosine similarity → returns top-k chunks with source metadata → display in search.html"
+      }
+    },
+
+    "layer_5_ui": {
+      "hosting": "GitHub Pages — same repo as sprint platform or new repo",
+      "shared_assets": ["supabase-client.js", "lang.js", "design system Tailwind config"],
+      "pages": [
+        {
+          "file": "index.html",
+          "role": "Project dashboard",
+          "reads": "Supabase REST — projects, recent updates, open tasks",
+          "features": ["Project cards with status", "Recent activity feed", "Open tasks per project", "Link to facilitate.html sessions", "Search bar → search.html"]
+        },
+        {
+          "file": "update.html",
+          "role": "Quick capture form",
+          "writes": "POST to OpenClaw /ingest via Tailscale URL",
+          "features": ["Project selector dropdown (loaded from Supabase)", "Large textarea for raw paste", "Source tag (meeting / claude / note)", "Submit → shows extracted summary for confirmation"]
+        },
+        {
+          "file": "search.html",
+          "role": "Semantic search interface",
+          "writes": "POST to OpenClaw /search",
+          "features": ["Natural language query input", "Results ranked by cosine similarity", "Each result shows source project, date, type", "Click → opens full update in context"]
+        }
+      ]
+    }
+  },
+
+  "tech_stack": {
+    "hardware": {
+      "device": "Mac Mini M1 8GB",
+      "role": "Always-on local server — orchestration + inference",
+      "note": "8GB unified memory comfortably fits Gemma 3 4B + nomic-embed-text simultaneously"
+    },
+    "local_models": {
+      "runtime": "Ollama",
+      "api": "localhost:11434 — OpenAI-compatible REST API",
+      "models": [
+        {
+          "name": "gemma3:4b",
+          "size": "~3.3GB",
+          "role": "Classification + structured extraction",
+          "pull": "ollama pull gemma3:4b"
+        },
+        {
+          "name": "nomic-embed-text",
+          "size": "274MB",
+          "role": "768-dim semantic embeddings",
+          "pull": "ollama pull nomic-embed-text"
+        }
+      ]
+    },
+    "orchestration": {
+      "name": "OpenClaw",
+      "location": "Mac Mini — existing installation",
+      "new_routes": ["/ingest", "/search", "/projects", "/health"],
+      "file_watcher": "chokidar (Node) or watchdog (Python) depending on OpenClaw language"
+    },
+    "database": {
+      "name": "Supabase",
+      "plan": "Free tier — sufficient for personal use",
+      "extensions": ["pgvector"],
+      "existing_project": "Same project as sprint platform (reuse connection)"
+    },
+    "tunnel": {
+      "name": "Tailscale (recommended)",
+      "alternative": "Cloudflare Tunnel",
+      "purpose": "Expose OpenClaw to internet for update.html"
+    },
+    "frontend": {
+      "framework": "Vanilla HTML + Tailwind CDN",
+      "hosting": "GitHub Pages — blackmath88/onehour-minisprint or new repo",
+      "design_system": "Existing — Plus Jakarta Sans + Indigo-on-Cream palette"
+    },
+    "estimated_monthly_cost": "$0 — all free tiers, zero cloud inference"
+  },
+
+  "build_sequence": [
+    {
+      "phase": 1,
+      "name": "Foundation",
+      "estimated_time": "2 hours",
+      "tasks": [
+        "Install Ollama on Mac Mini if not present",
+        "ollama pull gemma3:4b",
+        "ollama pull nomic-embed-text",
+        "Run CREATE EXTENSION IF NOT EXISTS vector in Supabase SQL editor",
+        "Create all five tables (projects, updates, tasks, decisions, embeddings)",
+        "Seed 3-5 real active projects manually",
+        "Verify Supabase REST queries work from browser"
+      ],
+      "done_when": "Dashboard can read projects from Supabase"
+    },
+    {
+      "phase": 2,
+      "name": "Ingestion pipeline",
+      "estimated_time": "4-6 hours",
+      "tasks": [
+        "Add POST /ingest route to OpenClaw",
+        "Call Ollama gemma3:4b for classify_input job",
+        "Call Ollama gemma3:4b for extract_structure job",
+        "Call Ollama nomic-embed-text for embedding job",
+        "Write structured rows to Supabase tables",
+        "Write embedding row to embeddings table",
+        "Test with curl from terminal"
+      ],
+      "done_when": "curl POST with raw text → structured row appears in Supabase → embedding stored"
+    },
+    {
+      "phase": 3,
+      "name": "Remote access",
+      "estimated_time": "30 minutes",
+      "tasks": [
+        "Install Tailscale on Mac Mini",
+        "Note the Tailscale IP for OpenClaw port",
+        "Update update.html to POST to Tailscale URL",
+        "Test POST from mobile browser"
+      ],
+      "done_when": "update.html on GitHub Pages POSTs successfully to Mac Mini from 4G"
+    },
+    {
+      "phase": 4,
+      "name": "Dashboard + capture UI",
+      "estimated_time": "4-6 hours",
+      "tasks": [
+        "Build index.html — project cards, recent activity, open tasks",
+        "Build update.html — project dropdown, textarea, POST to /ingest",
+        "Add confirmation step showing Gemma-extracted summary before save",
+        "Wire search bar to POST /search → display results"
+      ],
+      "done_when": "Full loop: paste note on phone → appears in dashboard → searchable"
+    },
+    {
+      "phase": 5,
+      "name": "File watcher",
+      "estimated_time": "2 hours",
+      "tasks": [
+        "Add file watcher to OpenClaw for ~/pm-inbox/ folder",
+        "Auto-ingest any new .txt file",
+        "Move processed files to ~/pm-inbox/processed/",
+        "Test by dropping a Claude conversation export into the folder"
+      ],
+      "done_when": "Drop text file → appears in dashboard automatically"
+    }
+  ],
+
+  "open_questions": [
+    {
+      "question": "What language and framework is OpenClaw running on?",
+      "why_it_matters": "Determines whether new routes are Node.js, Python, or something else"
+    },
+    {
+      "question": "Is Ollama already installed on the Mac Mini?",
+      "why_it_matters": "Phase 1 dependency — if not, install first"
+    },
+    {
+      "question": "Tailscale or Cloudflare Tunnel preference?",
+      "why_it_matters": "Tailscale is simpler for personal use, Cloudflare gives a public URL"
+    },
+    {
+      "question": "What are the 3-5 active projects to seed first?",
+      "why_it_matters": "Shapes the schema validation and makes phase 1 immediately useful"
+    },
+    {
+      "question": "Should this live in the existing sprint platform repo or a new one?",
+      "why_it_matters": "Determines file structure and whether supabase-client.js is shared"
+    }
+  ],
+
+  "explicitly_deferred": [
+    "Authentication / multi-user access",
+    "Mobile native app",
+    "Calendar or email integration",
+    "Automatic Claude conversation capture (blocked by Claude.ai CSP)",
+    "Cloud inference fallback for when Mac Mini is offline",
+    "Paid Supabase tier / production hardening",
+    "Voice memo transcription pipeline"
+  ],
+
+  "connection_to_existing_work": {
+    "sprint_platform": "Same Supabase project, same design system, same GitHub Pages repo. Sessions from sprint board can be linked to projects via project_id.",
+    "imd_change_tool": "Change project phases map directly to updates table. Tool outputs become ingestion candidates.",
+    "design_sprint_kb": "Knowledge base content can be vectorized and added to embeddings — enables semantic search across methodology + project data together."
+  }
+}
