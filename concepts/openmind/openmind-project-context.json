@@ -1,0 +1,196 @@
+{
+  "project": {
+    "name": "OpenMind",
+    "tagline": "AI-native personal project operating system",
+    "owner": "Achim Imboden",
+    "version": "0.2",
+    "status": "architecture confirmed — build starting",
+    "created": "2026-04-11",
+    "hub_chat": "This conversation is the architecture hub. All spoke chats reference this context."
+  },
+
+  "owner": {
+    "name": "Achim Imboden",
+    "role": "Change management expert + AI Adoption Architect, University of Basel",
+    "technical_level": "Vibe coder — strong product instincts, comfortable with HTML/JS/CSS, learning backend",
+    "collaborator": "Sebastian (codebar) — Laravel/PHP expert, joins later phases"
+  },
+
+  "problem": {
+    "core": "Multiple active projects scattered across Claude conversations with no unified view, no persistent memory, and no way to query semantically across all content.",
+    "pain_points": [
+      "Claude conversations end and context is lost",
+      "HTML tools produce outputs that go nowhere",
+      "Meeting notes never connect to projects",
+      "No portfolio view across all active work",
+      "Status always in head, never in a system"
+    ]
+  },
+
+  "vision": "A local-first, AI-native project operating system. Raw inputs flow into a Node.js orchestration server on a dedicated Mac Mini M1. Two local models run in parallel on every input: qwen2.5:3b extracts structured data, nomic-embed-text generates a semantic vector. Both write to Supabase. A static GitHub Pages dashboard reads from Supabase for exact queries and semantic search. Zero cloud inference cost. Private data stays local.",
+
+  "principles": [
+    "Capture friction must be near zero — every input path under 60 seconds",
+    "Intelligence at ingestion, not at query time",
+    "Two query modes always available: exact SQL and semantic similarity",
+    "No cloud dependency for AI — everything runs on Mac Mini",
+    "Static frontend — no backend server beyond the Node.js orchestration server",
+    "Own every line — no OpenClaw, purpose-built Node.js server from scratch"
+  ],
+
+  "mac_mini": {
+    "device": "Mac Mini M1 8GB",
+    "role": "Dedicated always-on local server — orchestration + inference only",
+    "usage": "Headless server — not used as a personal computer",
+    "confirmed_installed": {
+      "homebrew": "5.1.3",
+      "ollama": "0.19.0 — running",
+      "node": "v25.8.2",
+      "npm": "11.11.1",
+      "tailscale": "1.96.4",
+      "nomic_embed_text": "274MB — pulled and ready",
+      "qwen2_5_3b": "1.9GB — already installed, replaces Gemma 3 4B"
+    },
+    "pending": [
+      "tailscale status — check if authenticated",
+      "launchd services for ollama + node server auto-start on boot"
+    ]
+  },
+
+  "architecture_decisions": {
+    "extraction_model": "qwen2.5:3b instead of gemma3:4b — already installed, stronger JSON instruction following",
+    "embedding_model": "nomic-embed-text — 768-dim vectors",
+    "orchestration": "Purpose-built Node.js + Express server (~120 lines) — replaces OpenClaw entirely",
+    "remote_access": "Tailscale — private mesh VPN, already installed",
+    "database": "Supabase free tier — same project as existing Decision Jam sprint platform",
+    "frontend": "Static HTML + Tailwind CDN on GitHub Pages — same repo as sprint platform",
+    "inference_cost": "$0/month — all local",
+    "total_monthly_cost": "$0"
+  },
+
+  "tech_stack": {
+    "server": {
+      "runtime": "Node.js v25.8.2",
+      "framework": "Express",
+      "location": "Mac Mini — ~/openmind-server/",
+      "port": 3000,
+      "endpoints": [
+        "POST /ingest — classify + extract + embed → write to Supabase",
+        "POST /search — embed query → pgvector cosine similarity → return top-k",
+        "GET /projects — return project list from Supabase",
+        "GET /health — Ollama status + Supabase connectivity + last ingest timestamp"
+      ]
+    },
+    "models": {
+      "extraction": {
+        "name": "qwen2.5:3b",
+        "ollama_api": "http://localhost:11434/api/generate",
+        "jobs": ["classify_input", "extract_structure"]
+      },
+      "embedding": {
+        "name": "nomic-embed-text",
+        "ollama_api": "http://localhost:11434/api/embeddings",
+        "output": "float[768]",
+        "parallel": true
+      }
+    },
+    "database": {
+      "provider": "Supabase",
+      "plan": "Free tier",
+      "existing_project": "Same as Decision Jam sprint platform",
+      "vector_extension": "pgvector",
+      "tables": ["projects", "updates", "tasks", "decisions", "embeddings"]
+    },
+    "tunnel": {
+      "tool": "Tailscale",
+      "status": "installed, auth status TBD"
+    },
+    "frontend": {
+      "hosting": "GitHub Pages — https://blackmath88.github.io/onehour-minisprint/",
+      "shared": ["supabase-client.js", "lang.js"],
+      "design_system": {
+        "fonts": ["Plus Jakarta Sans", "Inter"],
+        "palette": "Indigo-on-Cream — primary #2a14b4, bg #faf9f5"
+      },
+      "pages": ["pm-dashboard.html", "pm-update.html", "pm-search.html"]
+    }
+  },
+
+  "database_schema": {
+    "extension": "CREATE EXTENSION IF NOT EXISTS vector;",
+    "tables": {
+      "projects": "CREATE TABLE projects (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, code text UNIQUE, title text NOT NULL, status text DEFAULT 'active', description text, context_url text, facilitator text, updated_at timestamptz DEFAULT now(), created_at timestamptz DEFAULT now());",
+      "updates": "CREATE TABLE updates (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, project_id uuid REFERENCES projects(id) ON DELETE CASCADE, raw_text text, summary text, input_type text, source text, submitted_at timestamptz DEFAULT now());",
+      "tasks": "CREATE TABLE tasks (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, project_id uuid REFERENCES projects(id) ON DELETE CASCADE, update_id uuid REFERENCES updates(id) ON DELETE SET NULL, title text NOT NULL, status text DEFAULT 'open', due_date date, created_at timestamptz DEFAULT now());",
+      "decisions": "CREATE TABLE decisions (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, project_id uuid REFERENCES projects(id) ON DELETE CASCADE, update_id uuid REFERENCES updates(id) ON DELETE SET NULL, body text NOT NULL, made_at timestamptz DEFAULT now());",
+      "embeddings": "CREATE TABLE embeddings (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, source_id uuid NOT NULL, source_type text NOT NULL, content text NOT NULL, embedding vector(768), created_at timestamptz DEFAULT now()); CREATE INDEX ON embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);"
+    },
+    "rls": "Public read/write — anon key access, same pattern as sprint platform sessions table"
+  },
+
+  "orchestration_jobs": {
+    "classify_input": {
+      "model": "qwen2.5:3b",
+      "goal": "Determine input type and which project it belongs to",
+      "output_schema": {
+        "input_type": "update | decision | task_list | idea | meeting_note | reflection",
+        "project_id_guess": "string or null",
+        "confidence": "high | medium | low"
+      }
+    },
+    "extract_structure": {
+      "model": "qwen2.5:3b",
+      "goal": "Extract structured data from raw text",
+      "output_schema": {
+        "summary": "2-3 sentence summary",
+        "tasks": "array of { title, status, due_date? }",
+        "decisions": "array of { body, context }",
+        "status_change": "{ old_status, new_status } or null",
+        "tags": "string array",
+        "next_review_date": "date string or null"
+      }
+    },
+    "generate_embedding": {
+      "model": "nomic-embed-text",
+      "runs": "parallel with extraction jobs — not sequential",
+      "output": "float[768]"
+    }
+  },
+
+  "build_phases": [
+    { "phase": 1, "name": "Supabase schema + seed data", "spoke": "spoke-1-supabase.md", "est": "2 hours", "status": "next" },
+    { "phase": 2, "name": "Node.js server + Ollama integration", "spoke": "spoke-2-server.md", "est": "4-6 hours", "status": "pending" },
+    { "phase": 3, "name": "Tailscale remote access", "spoke": "spoke-3-tailscale.md", "est": "30 minutes", "status": "pending" },
+    { "phase": 4, "name": "Frontend — dashboard, capture, search", "spoke": "spoke-4-frontend.md", "est": "4-6 hours", "status": "pending" },
+    { "phase": 5, "name": "File watcher — drop folder ingestion", "spoke": "spoke-5-filewatcher.md", "est": "2 hours", "status": "pending" },
+    { "phase": 6, "name": "Kindling bridge — contact network layer", "spoke": "spoke-6-kindling.md", "est": "3-4 hours", "status": "deferred" }
+  ],
+
+  "kindling_integration": {
+    "decision": "Keep Kindling as separate tool. Add lightweight bridge in Phase 6.",
+    "bridge_mechanism": "Add contact_id FK to projects table. Add project_id FK to Kindling person schema.",
+    "deferred_until": "OpenMind Phase 1-4 stable and running for 4-6 weeks",
+    "kindling_repo": "https://github.com/achimimboden/kindling"
+  },
+
+  "explicitly_deferred": [
+    "Authentication / multi-user",
+    "Voice memo transcription",
+    "Calendar or email integration",
+    "Automatic Claude conversation capture (blocked by Claude.ai CSP)",
+    "Cloud inference fallback",
+    "Paid Supabase tier",
+    "Mobile native app"
+  ],
+
+  "existing_tools": {
+    "sprint_platform": "https://blackmath88.github.io/onehour-minisprint/ — same Supabase project, same repo, same design system",
+    "kindling": "https://github.com/achimimboden/kindling — personal network visualizer, Phase 6 integration target"
+  },
+
+  "open_questions_remaining": [
+    "tailscale status — is it authenticated and connected?",
+    "What are the 3-5 active projects to seed the database with?",
+    "Supabase project URL and anon key (needed for server .env)"
+  ]
+}
