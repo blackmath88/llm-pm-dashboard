@@ -1,0 +1,100 @@
+
+<h2 class="sr-only">AI-native personal PM system — full architecture diagram with OpenClaw, Gemma, vector layer, and Supabase</h2>
+<div id="mmd"></div>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Plus Jakarta Sans", sans-serif',
+  flowchart: { curve: 'basis', nodeSpacing: 40, rankSpacing: 52 },
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: '"Plus Jakarta Sans", sans-serif',
+    primaryColor: dark ? '#26215C' : '#EEEDFE',
+    primaryTextColor: dark ? '#CECBF6' : '#26215C',
+    primaryBorderColor: dark ? '#534AB7' : '#7F77DD',
+    secondaryColor: dark ? '#04342C' : '#E1F5EE',
+    secondaryTextColor: dark ? '#9FE1CB' : '#04342C',
+    tertiaryColor: dark ? '#412402' : '#FAEEDA',
+    tertiaryTextColor: dark ? '#FAC775' : '#412402',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    textColor: dark ? '#c2c0b6' : '#3d3d3a',
+    nodeBorder: dark ? '#534AB7' : '#AFA9EC',
+    clusterBkg: dark ? '#1a1a18' : '#f5f4f0',
+    clusterBorder: dark ? '#444441' : '#D3D1C7',
+    edgeLabelBackground: dark ? '#2c2c2a' : '#faf9f5',
+  }
+});
+
+const diagram = `
+flowchart TD
+    subgraph INPUTS["Input sources"]
+        A1[Claude conversation export]
+        A2[update.html paste]
+        A3[File drop — watched folder]
+    end
+
+    subgraph MINI["Mac Mini — always on"]
+        direction TB
+        OC[OpenClaw HTTP server\\nPOST /ingest · POST /search]
+
+        subgraph MODELS["Local models via Ollama"]
+            G[Gemma 3 4B\\nclassify · extract · structure]
+            E[nomic-embed-text\\n768-dim embeddings]
+        end
+
+        OC -->|raw text| G
+        OC -->|raw text| E
+    end
+
+    subgraph TUNNEL["Remote access"]
+        T[Tailscale or Cloudflare Tunnel\\nalways-on · zero config]
+    end
+
+    subgraph SUPA["Supabase — cloud storage"]
+        direction LR
+        S1[(projects)]
+        S2[(updates)]
+        S3[(tasks)]
+        S4[(decisions)]
+        S5[(embeddings\\npgvector)]
+    end
+
+    subgraph UI["GitHub Pages — static UI"]
+        D1[index.html\\nproject dashboard]
+        D2[update.html\\npaste + save]
+        D3[search.html\\nsemantic query]
+    end
+
+    A1 --> OC
+    A2 --> T
+    A3 --> OC
+    T --> OC
+
+    G -->|structured JSON| S1
+    G -->|structured JSON| S2
+    G -->|structured JSON| S3
+    G -->|structured JSON| S4
+    E -->|vector float| S5
+
+    S1 --> D1
+    S2 --> D1
+    S3 --> D1
+    S4 --> D1
+    S5 -->|cosine similarity| D3
+
+    D2 -->|HTTP POST| T
+`;
+
+const { svg } = await mermaid.render('mmd-svg', diagram);
+document.getElementById('mmd').innerHTML = svg;
+
+document.querySelectorAll('#mmd svg .node rect, #mmd svg .node polygon').forEach(el => {
+  const r = el.getAttribute('rx');
+  if (!r || r === '0') el.setAttribute('rx', '6');
+});
+</script>
